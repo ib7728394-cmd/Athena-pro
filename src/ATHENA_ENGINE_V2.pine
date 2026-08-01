@@ -39,3 +39,32 @@ athenaScore = trendScore + momentumScore + volatilityScore
 // ======================================
 
 decisionEngine = true
+// =====================================
+// ATHENA DECISION LOGIC
+// =====================================
+
+buySignal = athenaScore >= 70 and trendBullish
+sellSignal = athenaScore >= 70 and trendBearish
+
+
+// =====================================
+// AFFICHAGE SIGNAUX
+// =====================================
+
+plotshape(
+     buySignal,
+     title="ATHENA BUY",
+     style=shape.labelup,
+     text="ATHENA BUY",
+     color=color.green,
+     textcolor=color.white
+)
+
+plotshape(
+     sellSignal,
+     title="ATHENA SELL",
+     style=shape.labeldown,
+     text="ATHENA SELL",
+     color=color.red,
+     textcolor=color.white
+)
