@@ -34,3 +34,8 @@ volatilityScore = atrValue > ta.sma(atrValue,20) ? 20 : 0
 
 
 athenaScore = trendScore + momentumScore + volatilityScore
+// ======================================
+// SPRINT 3 - ATHENA DECISION ENGINE
+// ======================================
+
+decisionEngine = true
