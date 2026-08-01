@@ -1,0 +1,69 @@
+//@version=6
+
+indicator("ATHENA V3 - Signal Engine", overlay=true, max_labels_count=500)
+
+// ==========================================
+// ATHENA SIGNAL ENGINE V3
+// Génération intelligente de signaux
+// ==========================================
+
+
+// PARAMÈTRES
+
+showSignals = input.bool(true, "Afficher Signaux")
+showScore = input.bool(true, "Afficher Score ATHENA")
+
+
+// ANALYSE TENDANCE
+
+emaFast = ta.ema(close, 50)
+emaSlow = ta.ema(close, 200)
+
+trendBullish = emaFast > emaSlow
+trendBearish = emaFast < emaSlow
+
+
+// MOMENTUM
+
+rsiValue = ta.rsi(close,14)
+
+momentumBullish = rsiValue > 50
+momentumBearish = rsiValue < 50
+
+
+// VOLATILITÉ
+
+atrValue = ta.atr(14)
+
+volatilityOK = atrValue > ta.sma(atrValue,20)
+
+
+// SCORE ATHENA
+
+athenaScore = 0
+
+athenaScore += trendBullish ? 40 : 0
+athenaScore += momentumBullish ? 30 : 0
+athenaScore += volatilityOK ? 30 : 0
+
+
+// SIGNAL
+
+buySignal = athenaScore >= 70
+sellSignal = athenaScore <= 30
+
+
+// AFFICHAGE
+
+plot(emaFast, color=color.green)
+plot(emaSlow, color=color.red)
+
+
+if showSignals and buySignal
+    label.new(bar_index, low, "ATHENA BUY\nScore: " + str.tostring(athenaScore),
+     style=label.style_label_up)
+
+
+if showSignals and sellSignal
+    label.new(bar_index, high, "ATHENA SELL\nScore: " + str.tostring(athenaScore),
+     style=label.style_label_down)
