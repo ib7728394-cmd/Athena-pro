@@ -1,0 +1,36 @@
+//@version=6
+
+indicator("ATHENA V2 - Intelligence Engine", overlay=true, max_labels_count=500)
+
+
+// ==========================================
+// ATHENA INTELLIGENCE CORE
+// Moteur de décision multi-confluence
+// ==========================================
+
+
+// PARAMÈTRES
+
+showDashboard = input.bool(true, "Afficher Dashboard ATHENA")
+showSignals = input.bool(true, "Afficher Signaux")
+// =====================================
+// ATHENA SCORE ENGINE
+// =====================================
+
+emaFast = ta.ema(close,50)
+emaSlow = ta.ema(close,200)
+
+trendScore = emaFast > emaSlow ? 30 : 0
+
+
+rsiValue = ta.rsi(close,14)
+
+momentumScore = rsiValue > 50 ? 25 : 0
+
+
+atrValue = ta.atr(14)
+
+volatilityScore = atrValue > ta.sma(atrValue,20) ? 20 : 0
+
+
+athenaScore = trendScore + momentumScore + volatilityScore
