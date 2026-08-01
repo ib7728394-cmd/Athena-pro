@@ -1,0 +1,167 @@
+//@version=6
+indicator("ATHENA V1.0 - AI Trading Assistant", overlay=true, max_labels_count=500)
+
+// =====================================================
+// ATHENA CORE ENGINE V1
+// Assistant d'analyse technique intelligent
+// =====================================================
+
+
+// ===============================
+// PARAMÈTRES
+// ===============================
+
+showSignals = input.bool(true, "Afficher les signaux")
+showScore = input.bool(true, "Afficher le score ATHENA")
+
+
+// ===============================
+// ANALYSE DE TENDANCE
+// ===============================
+
+// Moyennes mobiles utilisées pour la structure
+emaFast = ta.ema(close, 50)
+emaSlow = ta.ema(close, 200)
+
+trendBullish = emaFast > emaSlow
+trendBearish = emaFast < emaSlow
+
+
+// ===============================
+// DETECTION DES DOJIS
+// ===============================
+
+bodySize = math.abs(close - open)
+candleRange = high - low
+
+doji = bodySize <= candleRange * 0.1
+
+
+// Doji après mouvement baissier
+previousDown = close[1] < open[1]
+
+// Doji après mouvement haussier
+previousUp = close[1] > open[1]
+
+
+bullishDoji = doji and previousDown
+bearishDoji = doji and previousUp
+
+
+// ===============================
+// SCORE ATHENA
+// ===============================
+
+score = 0
+
+
+// Tendance
+if trendBullish
+    score += 30
+
+if trendBearish
+    score += 30
+
+
+// Chandeliers
+if bullishDoji
+    score += 20
+
+if bearishDoji
+    score += 20
+
+
+// Structure prix
+if close > emaFast
+    score += 20
+
+
+if close < emaFast
+    score += 20
+
+
+
+// Limitation du score
+athenaScore = math.min(score, 100)
+
+
+// ===============================
+// DECISION ATHENA
+// ===============================
+
+buySignal = athenaScore >= 75 and trendBullish
+sellSignal = athenaScore >= 75 and trendBearish
+
+
+// ===============================
+// AFFICHAGE
+// ===============================
+
+plot(emaFast, color=color.blue, title="EMA 50")
+plot(emaSlow, color=color.red, title="EMA 200")
+
+
+if showSignals and buySignal
+    label.new(
+     bar_index,
+     low,
+     "ATHENA\nACHAT\nScore : " + str.tostring(athenaScore) + "%",
+     style=label.style_label_up,
+     color=color.green,
+     textcolor=color.white)
+
+
+if showSignals and sellSignal
+    label.new(
+     bar_index,
+     high,
+     "ATHENA\nVENTE\nScore : " + str.tostring(athenaScore) + "%",
+     style=label.style_label_down,
+     color=color.red,
+     textcolor=color.white)
+
+
+
+// ===============================
+// TABLEAU ATHENA
+// ===============================
+
+if showScore
+
+    var table athenaTable = table.new(
+     position.top_right,
+     2,
+     3)
+
+    table.cell(
+     athenaTable,
+     0,
+     0,
+     "ATHENA V1")
+
+    table.cell(
+     athenaTable,
+     0,
+     1,
+     "Score")
+
+    table.cell(
+     athenaTable,
+     1,
+     1,
+     str.tostring(athenaScore) + "%")
+
+
+    table.cell(
+     athenaTable,
+     0,
+     2,
+     "Signal")
+
+    table.cell(
+     athenaTable,
+     1,
+     2,
+     buySignal ? "ACHAT" :
+     sellSignal ? "VENTE" :
+     "ATTENTE")
