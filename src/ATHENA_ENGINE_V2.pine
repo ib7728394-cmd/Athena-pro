@@ -2,69 +2,162 @@
 
 indicator("ATHENA V2 - Intelligence Engine", overlay=true, max_labels_count=500)
 
-
 // ==========================================
 // ATHENA INTELLIGENCE CORE
-// Moteur de décision multi-confluence
 // ==========================================
-
 
 // PARAMÈTRES
 
 showDashboard = input.bool(true, "Afficher Dashboard ATHENA")
 showSignals = input.bool(true, "Afficher Signaux")
+
 // =====================================
-// ATHENA SCORE ENGINE
+// TREND ENGINE
 // =====================================
 
-emaFast = ta.ema(close,50)
-emaSlow = ta.ema(close,200)
+emaFast = ta.ema(close, 50)
+emaSlow = ta.ema(close, 200)
 
-trendScore = emaFast > emaSlow ? 30 : 0
+trendBullish = emaFast > emaSlow
+trendBearish = emaFast < emaSlow
 
+trendScore = trendBullish ? 30 : 0
 
-rsiValue = ta.rsi(close,14)
+// =====================================
+// MOMENTUM ENGINE
+// =====================================
 
-momentumScore = rsiValue > 50 ? 25 : 0
+rsiValue = ta.rsi(close, 14)
 
+momentumBullish = rsiValue > 50
+momentumBearish = rsiValue < 50
+
+momentumScore = momentumBullish ? 25 : 0
+
+// =====================================
+// VOLATILITY ENGINE
+// =====================================
 
 atrValue = ta.atr(14)
 
-volatilityScore = atrValue > ta.sma(atrValue,20) ? 20 : 0
+volatilityScore = atrValue > ta.sma(atrValue, 20) ? 20 : 0
 
-
-athenaScore = trendScore + momentumScore + volatilityScore
-// ======================================
-// SPRINT 3 - ATHENA DECISION ENGINE
-// ======================================
-
-decisionEngine = true
 // =====================================
-// ATHENA DECISION LOGIC
+// STRUCTURE ENGINE (SPRINT 7)
+// =====================================
+
+pivotLength = input.int(5, "Swing Length", minval = 2)
+
+pivotHigh = ta.pivothigh(high, pivotLength, pivotLength)
+pivotLow = ta.pivotlow(low, pivotLength, pivotLength)
+
+var float lastHigh = na
+var float previousHigh = na
+
+var float lastLow = na
+var float previousLow = na
+
+if not na(pivotHigh)
+    previousHigh := lastHigh
+    lastHigh := pivotHigh
+
+if not na(pivotLow)
+    previousLow := lastLow
+    lastLow := pivotLow
+
+higherHigh = not na(previousHigh) and lastHigh > previousHigh
+lowerHigh = not na(previousHigh) and lastHigh < previousHigh
+
+higherLow = not na(previousLow) and lastLow > previousLow
+lowerLow = not na(previousLow) and lastLow < previousLow
+
+bullStructure = higherHigh and higherLow
+bearStructure = lowerHigh and lowerLow
+
+bullBOS = bullStructure and not na(lastHigh) and close > lastHigh
+bearBOS = bearStructure and not na(lastLow) and close < lastLow
+
+bullChoch = bearStructure and not na(lastHigh) and close > lastHigh
+bearChoch = bullStructure and not na(lastLow) and close < lastLow
+
+structureScore = (bullStructure or bearStructure) ? 25 : 0
+
+// =====================================
+// ATHENA SCORE
+// =====================================
+
+athenaScore = trendScore + momentumScore + volatilityScore + structureScore
+
+// =====================================
+// DECISION ENGINE
 // =====================================
 
 buySignal = athenaScore >= 70 and trendBullish
 sellSignal = athenaScore >= 70 and trendBearish
 
+// =====================================
+// AFFICHAGE
+// =====================================
 
-// =====================================
-// AFFICHAGE SIGNAUX
-// =====================================
+plot(emaFast, title="EMA 50", color=color.green)
+plot(emaSlow, title="EMA 200", color=color.red)
 
 plotshape(
-     buySignal,
-     title="ATHENA BUY",
-     style=shape.labelup,
-     text="ATHENA BUY",
-     color=color.green,
-     textcolor=color.white
+    buySignal,
+    title="ATHENA BUY",
+    style=shape.labelup,
+    location=location.belowbar,
+    color=color.green,
+    text="BUY",
+    textcolor=color.white
 )
 
 plotshape(
-     sellSignal,
-     title="ATHENA SELL",
-     style=shape.labeldown,
-     text="ATHENA SELL",
-     color=color.red,
-     textcolor=color.white
+    sellSignal,
+    title="ATHENA SELL",
+    style=shape.labeldown,
+    location=location.abovebar,
+    color=color.red,
+    text="SELL",
+    textcolor=color.white
+)
+
+plotshape(
+    bullBOS,
+    title="BOS Haussier",
+    style=shape.triangleup,
+    location=location.belowbar,
+    color=color.lime,
+    size=size.small,
+    text="BOS"
+)
+
+plotshape(
+    bearBOS,
+    title="BOS Baissier",
+    style=shape.triangledown,
+    location=location.abovebar,
+    color=color.red,
+    size=size.small,
+    text="BOS"
+)
+
+plotshape(
+    bullChoch,
+    title="CHoCH Haussier",
+    style=shape.circle,
+    location=location.belowbar,
+    color=color.blue,
+    size=size.tiny,
+    text="CH"
+)
+
+plotshape(
+    bearChoch,
+    title="CHoCH Baissier",
+    style=shape.circle,
+    location=location.abovebar,
+    color=color.orange,
+    size=size.tiny,
+    text="CH"
 )
