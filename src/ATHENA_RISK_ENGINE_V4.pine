@@ -1,0 +1,88 @@
+//@version=6
+
+indicator("ATHENA V4 - Risk Management Engine", overlay=true)
+
+
+// ==========================================
+// ATHENA RISK MANAGEMENT ENGINE V4
+// Gestion intelligente du risque
+// ==========================================
+
+
+// PARAMÈTRES
+
+riskReward = input.float(2.0, "Risk Reward Ratio")
+atrMultiplier = input.float(1.5, "ATR Stop Multiplier")
+
+
+// ==========================================
+// CALCUL ATR
+// ==========================================
+
+atrValue = ta.atr(14)
+
+
+// ==========================================
+// DÉTECTION TENDANCE
+// ==========================================
+
+ema50 = ta.ema(close,50)
+ema200 = ta.ema(close,200)
+
+bullish = ema50 > ema200
+bearish = ema50 < ema200
+
+
+// ==========================================
+// NIVEAUX DE RISQUE
+// ==========================================
+
+longStop = close - (atrValue * atrMultiplier)
+shortStop = close + (atrValue * atrMultiplier)
+
+
+longTarget = close + ((close - longStop) * riskReward)
+shortTarget = close - ((shortStop - close) * riskReward)
+
+
+// ==========================================
+// VALIDATION DU TRADE
+// ==========================================
+
+riskValid = riskReward >= 2
+
+
+buySetup = bullish and riskValid
+sellSetup = bearish and riskValid
+
+
+// ==========================================
+// AFFICHAGE
+// ==========================================
+
+plot(ema50, title="EMA 50")
+plot(ema200, title="EMA 200")
+
+
+plot(
+ buySetup ? longStop : na,
+ title="Stop Loss Achat"
+)
+
+
+plot(
+ buySetup ? longTarget : na,
+ title="Take Profit Achat"
+)
+
+
+plot(
+ sellSetup ? shortStop : na,
+ title="Stop Loss Vente"
+)
+
+
+plot(
+ sellSetup ? shortTarget : na,
+ title="Take Profit Vente"
+)
