@@ -1,17 +1,18 @@
 //@version=6
 
-indicator("ATHENA V2 - Smart Confluence Engine", overlay=true, max_labels_count=500)
+indicator("ATHENA V2 - Liquidity Intelligence Engine", overlay=true, max_labels_count=500)
 
 
 // ==========================================
 // ATHENA INTELLIGENCE CORE
-// SPRINT 8 - SMART CONFLUENCE ENGINE
+// SPRINT 9 - LIQUIDITY ENGINE
 // ==========================================
 
 
 // PARAMÈTRES
 
 showSignals = input.bool(true, "Afficher Signaux")
+
 
 
 // =====================================
@@ -30,6 +31,7 @@ trendScore = trendBullish ? 30 : 0
 
 
 
+
 // =====================================
 // MOMENTUM ENGINE
 // =====================================
@@ -45,6 +47,7 @@ momentumScore = momentumBullish ? 25 : 0
 
 
 
+
 // =====================================
 // VOLATILITY ENGINE
 // =====================================
@@ -57,9 +60,12 @@ volatilityScore =
 
 
 
+
+
 // =====================================
 // STRUCTURE ENGINE
 // =====================================
+
 
 pivotLength = input.int(5,"Swing Length",minval=2)
 
@@ -79,13 +85,17 @@ var float previousLow = na
 
 
 if not na(pivotHigh)
+
     previousHigh := lastHigh
     lastHigh := pivotHigh
 
 
+
 if not na(pivotLow)
+
     previousLow := lastLow
     lastLow := pivotLow
+
 
 
 
@@ -107,6 +117,8 @@ bearStructure = lowerHigh and lowerLow
 
 
 
+
+
 // =====================================
 // BOS / CHoCH ENGINE
 // =====================================
@@ -123,6 +135,7 @@ bearBOS =
      bearStructure and
      not na(lastLow) and
      close < lastLow
+
 
 
 
@@ -147,6 +160,47 @@ structureScore =
 
 
 
+
+// =====================================
+// ATHENA LIQUIDITY ENGINE
+// SPRINT 9
+// =====================================
+
+
+liquidityLength = input.int(20,"Liquidity Lookback")
+
+
+// anciens niveaux de liquidité
+
+previousHighLiquidity = ta.highest(high, liquidityLength)
+
+previousLowLiquidity = ta.lowest(low, liquidityLength)
+
+
+
+// Liquidity Sweep au-dessus des sommets
+
+buySideSweep =
+     high > previousHighLiquidity[1] and
+     close < previousHighLiquidity[1]
+
+
+
+// Liquidity Sweep sous les creux
+
+sellSideSweep =
+     low < previousLowLiquidity[1] and
+     close > previousLowLiquidity[1]
+
+
+
+liquidityScore =
+     (buySideSweep or sellSideSweep) ? 15 : 0
+
+
+
+
+
 // =====================================
 // SMART CONFLUENCE SCORE
 // =====================================
@@ -167,14 +221,18 @@ chochScore =
 
 
 
+
+
 athenaScore =
+
      trendScore +
      momentumScore +
      volatilityScore +
      structureScore +
      bosScore +
      chochScore +
-     volumeScore
+     volumeScore +
+     liquidityScore
 
 
 
@@ -203,6 +261,7 @@ gradeC = athenaScore >= 60
 
 
 buySignal =
+
      athenaScore >= 70 and
      trendBullish and
      (bullStructure or bullBOS or bullChoch)
@@ -210,9 +269,11 @@ buySignal =
 
 
 sellSignal =
+
      athenaScore >= 70 and
      trendBearish and
      (bearStructure or bearBOS or bearChoch)
+
 
 
 
@@ -230,11 +291,13 @@ plot(
 )
 
 
+
 plot(
      emaSlow,
      title="EMA 200",
      color=color.red
 )
+
 
 
 
@@ -264,6 +327,10 @@ plotshape(
 
 
 
+
+// BOS
+
+
 plotshape(
      bullBOS,
      title="BOS HAUSSIER",
@@ -287,6 +354,10 @@ plotshape(
 
 
 
+
+// CHoCH
+
+
 plotshape(
      bullChoch,
      title="CHoCH HAUSSIER",
@@ -305,4 +376,33 @@ plotshape(
      location=location.abovebar,
      color=color.orange,
      text="CH"
+)
+
+
+
+
+
+// =====================================
+// LIQUIDITY VISUALIZATION
+// =====================================
+
+
+plotshape(
+     buySideSweep,
+     title="Buy Side Liquidity Sweep",
+     style=shape.triangledown,
+     location=location.abovebar,
+     color=color.yellow,
+     text="LIQ"
+)
+
+
+
+plotshape(
+     sellSideSweep,
+     title="Sell Side Liquidity Sweep",
+     style=shape.triangleup,
+     location=location.belowbar,
+     color=color.yellow,
+     text="LIQ"
 )
