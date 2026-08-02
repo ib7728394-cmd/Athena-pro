@@ -3,279 +3,101 @@
 indicator("ATHENA V2 - Institutional Intelligence Engine", overlay=true, max_labels_count=500)
 
 
-// ==========================================
-// ATHENA INTELLIGENCE CORE
-// SPRINT 10 - ORDER BLOCK ENGINE
-// ==========================================
+// =====================================
+// PARAMETRES
+// =====================================
 
-
-// PARAMÈTRES
-
-showSignals = input.bool(true, "Afficher Signaux")
+showSignals = input.bool(true,"Afficher Signaux")
 
 
 // =====================================
-// TREND ENGINE
+// 1 - TREND ENGINE
 // =====================================
 
-emaFast = ta.ema(close,50)
-emaSlow = ta.ema(close,200)
+ema50 = ta.ema(close,50)
+ema200 = ta.ema(close,200)
 
+bullTrend = ema50 > ema200
+bearTrend = ema50 < ema200
 
-trendBullish = emaFast > emaSlow
-trendBearish = emaFast < emaSlow
-
-
-trendScore = trendBullish ? 30 : 0
+trendScore = bullTrend ? 30 : bearTrend ? -30 : 0
 
 
 
 // =====================================
-// MOMENTUM ENGINE
+// 2 - MOMENTUM ENGINE
 // =====================================
 
-rsiValue = ta.rsi(close,14)
+rsi = ta.rsi(close,14)
+
+bullMomentum = rsi > 55
+bearMomentum = rsi < 45
 
 
-momentumBullish = rsiValue > 50
-momentumBearish = rsiValue < 50
-
-
-momentumScore = momentumBullish ? 25 : 0
-
-
-
-// =====================================
-// VOLATILITY ENGINE
-// =====================================
-
-atrValue = ta.atr(14)
-
-
-volatilityScore =
-     atrValue > ta.sma(atrValue,20) ? 20 : 0
-
-
+momentumScore = bullMomentum ? 25 : bearMomentum ? -25 : 0
 
 
 
 // =====================================
-// STRUCTURE ENGINE
+// 3 - VOLATILITY ENGINE
 // =====================================
 
-pivotLength = input.int(5,"Swing Length",minval=2)
+atr = ta.atr(14)
+
+atrAverage = ta.sma(atr,20)
+
+volatilityActive = atr > atrAverage
+
+volatilityScore = volatilityActive ? 15 : 0
 
 
-pivotHigh = ta.pivothigh(high,pivotLength,pivotLength)
 
-pivotLow = ta.pivotlow(low,pivotLength,pivotLength)
+// =====================================
+// 4 - STRUCTURE ENGINE
+// =====================================
 
+pivot = input.int(5,"Structure Length")
+
+highPivot = ta.pivothigh(high,pivot,pivot)
+lowPivot = ta.pivotlow(low,pivot,pivot)
 
 
 var float lastHigh = na
-var float previousHigh = na
-
 var float lastLow = na
-var float previousLow = na
+
+
+if not na(highPivot)
+    lastHigh := highPivot
+
+if not na(lowPivot)
+    lastLow := lowPivot
 
 
 
-if not na(pivotHigh)
-    previousHigh := lastHigh
-    lastHigh := pivotHigh
-
-
-if not na(pivotLow)
-    previousLow := lastLow
-    lastLow := pivotLow
+bullBOS = not na(lastHigh) and close > lastHigh
+bearBOS = not na(lastLow) and close < lastLow
 
 
 
-
-
-higherHigh = not na(previousHigh) and lastHigh > previousHigh
-
-lowerHigh = not na(previousHigh) and lastHigh < previousHigh
-
-
-higherLow = not na(previousLow) and lastLow > previousLow
-
-lowerLow = not na(previousLow) and lastLow < previousLow
-
-
-
-bullStructure = higherHigh and higherLow
-
-bearStructure = lowerHigh and lowerLow
-
-
+structureScore = bullBOS ? 20 : bearBOS ? -20 : 0
 
 
 
 // =====================================
-// BOS / CHoCH ENGINE
+// 5 - LIQUIDITY ENGINE
 // =====================================
 
 
-bullBOS =
-     bullStructure and
-     not na(lastHigh) and
-     close > lastHigh
+previousHigh = ta.highest(high,20)
+previousLow = ta.lowest(low,20)
 
 
+liquidityBuy = low < previousLow and close > previousLow
 
-bearBOS =
-     bearStructure and
-     not na(lastLow) and
-     close < lastLow
+liquiditySell = high > previousHigh and close < previousHigh
 
 
-
-
-
-bullChoch =
-     bearStructure and
-     not na(lastHigh) and
-     close > lastHigh
-
-
-
-bearChoch =
-     bullStructure and
-     not na(lastLow) and
-     close < lastLow
-
-
-
-structureScore =
-     (bullStructure or bearStructure) ? 25 : 0
-
-
-
-
-
-// =====================================
-// LIQUIDITY ENGINE
-// SPRINT 9
-// =====================================
-
-
-liquidityLength = input.int(20,"Liquidity Lookback")
-
-
-previousHighLiquidity = ta.highest(high, liquidityLength)
-
-previousLowLiquidity = ta.lowest(low, liquidityLength)
-
-
-
-buySideSweep =
-     high > previousHighLiquidity[1] and
-     close < previousHighLiquidity[1]
-
-
-
-sellSideSweep =
-     low < previousLowLiquidity[1] and
-     close > previousLowLiquidity[1]
-
-
-
-liquidityScore =
-     (buySideSweep or sellSideSweep) ? 15 : 0
-
-
-
-
-
-// =====================================
-// ORDER BLOCK ENGINE
-// SPRINT 10
-// =====================================
-
-
-bullishOrderBlock =
-     close[1] < open[1] and
-     close > high[1]
-
-
-
-bearishOrderBlock =
-     close[1] > open[1] and
-     close < low[1]
-
-
-
-bullOBHigh = bullishOrderBlock ? high[1] : na
-
-bullOBLow = bullishOrderBlock ? low[1] : na
-
-
-bearOBHigh = bearishOrderBlock ? high[1] : na
-
-bearOBLow = bearishOrderBlock ? low[1] : na
-
-
-
-orderBlockScore =
-     (bullishOrderBlock or bearishOrderBlock) ? 15 : 0
-
-
-
-
-
-// =====================================
-// SMART CONFLUENCE SCORE
-// =====================================
-
-
-volumeScore =
-     volume > ta.sma(volume,20) ? 5 : 0
-
-
-
-bosScore =
-     (bullBOS or bearBOS) ? 15 : 0
-
-
-
-chochScore =
-     (bullChoch or bearChoch) ? 10 : 0
-
-
-
-
-
-athenaScore =
-
-     trendScore +
-     momentumScore +
-     volatilityScore +
-     structureScore +
-     bosScore +
-     chochScore +
-     volumeScore +
-     liquidityScore +
-     orderBlockScore
-
-
-
-
-
-// =====================================
-// QUALITY SYSTEM
-// =====================================
-
-
-gradeAPlus = athenaScore >= 90
-
-gradeA = athenaScore >= 80
-
-gradeB = athenaScore >= 70
-
-gradeC = athenaScore >= 60
-
-
+liquidityScore = liquidityBuy ? 10 : liquiditySell ? -10 : 0
 
 
 
@@ -284,173 +106,101 @@ gradeC = athenaScore >= 60
 // =====================================
 
 
-buySignal =
+totalScore = 
+     trendScore +
+     momentumScore +
+     volatilityScore +
+     structureScore +
+     liquidityScore
 
-     athenaScore >= 70 and
-     trendBullish and
-     (bullStructure or bullBOS or bullChoch)
+
+
+// COMPTE LES CONFIRMATIONS
+
+bullConfirmations = 0
+bearConfirmations = 0
+
+
+bullConfirmations += trendScore > 0 ? 1 : 0
+bullConfirmations += momentumScore > 0 ? 1 : 0
+bullConfirmations += structureScore > 0 ? 1 : 0
+bullConfirmations += liquidityScore > 0 ? 1 : 0
+
+
+bearConfirmations += trendScore < 0 ? 1 : 0
+bearConfirmations += momentumScore < 0 ? 1 : 0
+bearConfirmations += structureScore < 0 ? 1 : 0
+bearConfirmations += liquidityScore < 0 ? 1 : 0
+
+
+
+// =====================================
+// SYSTEME TOP 2 CONFIRMATIONS
+// =====================================
+
+
+buySignal =
+     bullConfirmations >= 2
+     and totalScore >= 50
 
 
 
 sellSignal =
-
-     athenaScore >= 70 and
-     trendBearish and
-     (bearStructure or bearBOS or bearChoch)
-
-
+     bearConfirmations >= 2
+     and totalScore <= -50
 
 
 
 // =====================================
-// AFFICHAGE PRINCIPAL
+// AFFICHAGE
 // =====================================
 
 
-plot(
-     emaFast,
-     title="EMA 50",
-     color=color.green
-)
+plot(ema50,color=color.green)
 
-
-plot(
-     emaSlow,
-     title="EMA 200",
-     color=color.red
-)
-
-
+plot(ema200,color=color.red)
 
 
 
 plotshape(
-     showSignals and buySignal,
-     title="ATHENA BUY",
-     style=shape.labelup,
-     location=location.belowbar,
-     color=color.green,
-     text="ATHENA BUY",
-     textcolor=color.white
+ buySignal,
+ title="ATHENA TOP 2 BUY",
+ style=shape.labelup,
+ location=location.belowbar,
+ color=color.green,
+ text="ATHENA BUY\nTOP 2",
+ textcolor=color.white
 )
 
 
 
 plotshape(
-     showSignals and sellSignal,
-     title="ATHENA SELL",
-     style=shape.labeldown,
-     location=location.abovebar,
-     color=color.red,
-     text="ATHENA SELL",
-     textcolor=color.white
-)
-
-
-
-
-
-// =====================================
-// BOS / CHoCH AFFICHAGE
-// =====================================
-
-
-plotshape(
-     bullBOS,
-     title="BOS HAUSSIER",
-     style=shape.triangleup,
-     location=location.belowbar,
-     color=color.lime,
-     text="BOS"
-)
-
-
-plotshape(
-     bearBOS,
-     title="BOS BAISSIER",
-     style=shape.triangledown,
-     location=location.abovebar,
-     color=color.red,
-     text="BOS"
+ sellSignal,
+ title="ATHENA TOP 2 SELL",
+ style=shape.labeldown,
+ location=location.abovebar,
+ color=color.red,
+ text="ATHENA SELL\nTOP 2",
+ textcolor=color.white
 )
 
 
 
 plotshape(
-     bullChoch,
-     title="CHoCH HAUSSIER",
-     style=shape.circle,
-     location=location.belowbar,
-     color=color.blue,
-     text="CH"
+ bullBOS,
+ title="Bull BOS",
+ style=shape.triangleup,
+ location=location.belowbar,
+ color=color.blue,
+ text="BOS"
 )
 
 
 plotshape(
-     bearChoch,
-     title="CHoCH BAISSIER",
-     style=shape.circle,
-     location=location.abovebar,
-     color=color.orange,
-     text="CH"
-)
-
-
-
-
-
-// =====================================
-// LIQUIDITY AFFICHAGE
-// =====================================
-
-
-plotshape(
-     buySideSweep,
-     title="BUY SIDE LIQUIDITY SWEEP",
-     style=shape.triangledown,
-     location=location.abovebar,
-     color=color.yellow,
-     text="LIQ"
-)
-
-
-
-plotshape(
-     sellSideSweep,
-     title="SELL SIDE LIQUIDITY SWEEP",
-     style=shape.triangleup,
-     location=location.belowbar,
-     color=color.yellow,
-     text="LIQ"
-)
-
-
-
-
-
-// =====================================
-// ORDER BLOCK AFFICHAGE
-// =====================================
-
-
-plotshape(
-     bullishOrderBlock,
-     title="BULLISH ORDER BLOCK",
-     style=shape.square,
-     location=location.belowbar,
-     color=color.green,
-     size=size.tiny,
-     text="OB"
-)
-
-
-
-plotshape(
-     bearishOrderBlock,
-     title="BEARISH ORDER BLOCK",
-     style=shape.square,
-     location=location.abovebar,
-     color=color.red,
-     size=size.tiny,
-     text="OB"
+ bearBOS,
+ title="Bear BOS",
+ style=shape.triangledown,
+ location=location.abovebar,
+ color=color.orange,
+ text="BOS"
 )
