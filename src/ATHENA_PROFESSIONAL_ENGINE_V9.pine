@@ -1,0 +1,683 @@
+//@version=6
+
+indicator(
+     "ATHENA V9.1 Professional Execution Engine",
+     overlay=true,
+     max_labels_count=500,
+     max_lines_count=500
+)
+
+//======================================================
+// INPUTS
+//======================================================
+
+showDashboard = input.bool(true,"Dashboard")
+
+showSignals = input.bool(true,"Signals")
+
+showStructure = input.bool(true,"Structure")
+
+
+//========================
+// RISK SETTINGS
+//========================
+
+atrMultiplierSL = input.float(
+     0.6,
+     "ATR Stop Loss",
+     minval=0.2,
+     step=0.1
+)
+
+riskRewardTP1 = input.float(
+     1.5,
+     "Take Profit 1",
+     minval=1
+)
+
+riskRewardTP2 = input.float(
+     2.0,
+     "Take Profit 2",
+     minval=1.5
+)
+
+
+//======================================================
+// TREND ENGINE
+//======================================================
+
+ema50 = ta.ema(close,50)
+
+ema200 = ta.ema(close,200)
+
+bullTrend = ema50 > ema200
+
+bearTrend = ema50 < ema200
+
+plot(
+     ema50,
+     color=color.green,
+     linewidth=2,
+     title="EMA 50"
+)
+
+plot(
+     ema200,
+     color=color.red,
+     linewidth=2,
+     title="EMA 200"
+)
+
+
+//======================================================
+// MOMENTUM ENGINE
+//======================================================
+
+rsi = ta.rsi(close,14)
+
+bullMomentum = rsi > 55
+
+bearMomentum = rsi < 45
+
+
+
+//======================================================
+// ATR ENGINE
+//======================================================
+
+atr = ta.atr(14)
+
+atrAverage = ta.sma(atr,20)
+
+highVolatility = atr > atrAverage
+
+
+
+//======================================================
+// VOLUME ENGINE
+//======================================================
+
+volumeAverage = ta.sma(volume,20)
+
+volumeConfirmation = volume > volumeAverage
+
+
+
+//======================================================
+// MARKET STRUCTURE
+//======================================================
+
+pivot = input.int(
+     5,
+     "Swing Length"
+)
+
+pivotHigh = ta.pivothigh(
+     high,
+     pivot,
+     pivot
+)
+
+pivotLow = ta.pivotlow(
+     low,
+     pivot,
+     pivot
+)
+
+var float previousHigh = na
+var float previousLow = na
+
+var float lastHigh = na
+var float lastLow = na
+
+
+if not na(pivotHigh)
+
+    previousHigh := lastHigh
+    lastHigh := pivotHigh
+
+
+if not na(pivotLow)
+
+    previousLow := lastLow
+    lastLow := pivotLow
+
+
+
+higherHigh =
+
+     not na(previousHigh)
+     and lastHigh > previousHigh
+
+higherLow =
+
+     not na(previousLow)
+     and lastLow > previousLow
+
+
+
+lowerHigh =
+
+     not na(previousHigh)
+     and lastHigh < previousHigh
+
+lowerLow =
+
+     not na(previousLow)
+     and lastLow < previousLow
+
+
+
+bullStructure =
+
+     higherHigh
+     and higherLow
+
+bearStructure =
+
+     lowerHigh
+     and lowerLow
+
+
+
+bullBOS =
+
+     bullStructure
+     and close > lastHigh
+
+bearBOS =
+
+     bearStructure
+     and close < lastLow
+
+
+
+bullCHoCH =
+
+     bearStructure
+     and close > lastHigh
+
+bearCHoCH =
+
+     bullStructure
+     and close < lastLow
+
+
+
+plotshape(
+     showStructure and bullBOS,
+     style=shape.triangleup,
+     location=location.belowbar,
+     color=color.lime,
+     text="BOS"
+)
+
+plotshape(
+     showStructure and bearBOS,
+     style=shape.triangledown,
+     location=location.abovebar,
+     color=color.red,
+     text="BOS"
+)
+
+plotshape(
+     showStructure and bullCHoCH,
+     style=shape.circle,
+     location=location.belowbar,
+     color=color.blue,
+     size=size.tiny,
+     text="CH"
+)
+
+plotshape(
+     showStructure and bearCHoCH,
+     style=shape.circle,
+     location=location.abovebar,
+     color=color.orange,
+     size=size.tiny,
+     text="CH"
+)
+//======================================================
+// LIQUIDITY ENGINE
+//======================================================
+
+liquidityHigh = high > ta.highest(high[1], 20)
+liquidityLow  = low  < ta.lowest(low[1], 20)
+
+bullLiquidity = liquidityLow and close > open
+bearLiquidity = liquidityHigh and close < open
+
+//======================================================
+// SCORE ENGINE
+//======================================================
+
+buyScore = 0
+sellScore = 0
+
+// Trend
+if bullTrend
+    buyScore += 25
+
+if bearTrend
+    sellScore += 25
+
+// Momentum
+if bullMomentum
+    buyScore += 15
+
+if bearMomentum
+    sellScore += 15
+
+// Volatility
+if highVolatility
+    buyScore += 10
+    sellScore += 10
+
+// Volume
+if volumeConfirmation
+    buyScore += 10
+    sellScore += 10
+
+// Structure
+if bullStructure
+    buyScore += 15
+
+if bearStructure
+    sellScore += 15
+
+// BOS
+if bullBOS
+    buyScore += 10
+
+if bearBOS
+    sellScore += 10
+
+// CHoCH
+if bullCHoCH
+    buyScore += 5
+
+if bearCHoCH
+    sellScore += 5
+
+// Liquidity
+if bullLiquidity
+    buyScore += 10
+
+if bearLiquidity
+    sellScore += 10
+
+buyScore := math.min(buyScore,100)
+sellScore := math.min(sellScore,100)
+
+//======================================================
+// CONFIDENCE ENGINE
+//======================================================
+
+confidence = math.max(buyScore, sellScore)
+
+//======================================================
+// ELITE SIGNAL FILTER
+//======================================================
+
+eliteBuy =
+     buyScore >= 75 and
+     confidence >= 75
+
+eliteSell =
+     sellScore >= 75 and
+     confidence >= 75
+
+//======================================================
+// ENTRY ZONE
+//======================================================
+
+// Zone plus réaliste autour de l'EMA 50
+
+entryLow =
+     ema50 - atr * 0.20
+
+entryHigh =
+     ema50 + atr * 0.20
+
+//======================================================
+// STOP LOSS ENGINE V9.1
+//======================================================
+
+// Dernier swing proche
+
+buySwing =
+     ta.lowest(low,10)
+
+sellSwing =
+     ta.highest(high,10)
+
+var float stopLoss = na
+
+if eliteBuy
+
+    stopLoss :=
+         math.min(
+             buySwing - atr*0.30,
+             close - atr*atrMultiplierSL
+         )
+
+if eliteSell
+
+    stopLoss :=
+         math.max(
+             sellSwing + atr*0.30,
+             close + atr*atrMultiplierSL
+         )
+
+//======================================================
+// TAKE PROFIT ENGINE V9.1
+//======================================================
+
+var float tp1 = na
+var float tp2 = na
+
+if eliteBuy
+
+    riskDistance =
+         math.abs(close-stopLoss)
+
+    tp1 :=
+         close + riskDistance*riskRewardTP1
+
+    tp2 :=
+         close + riskDistance*riskRewardTP2
+
+if eliteSell
+
+    riskDistance =
+         math.abs(stopLoss-close)
+
+    tp1 :=
+         close - riskDistance*riskRewardTP1
+
+    tp2 :=
+         close - riskDistance*riskRewardTP2
+
+//======================================================
+// LIQUIDITY DISPLAY
+//======================================================
+
+plotshape(
+     bullLiquidity,
+     style=shape.labelup,
+     location=location.belowbar,
+     color=color.blue,
+     text="LIQ",
+     textcolor=color.white
+)
+
+plotshape(
+     bearLiquidity,
+     style=shape.labeldown,
+     location=location.abovebar,
+     color=color.orange,
+     text="LIQ",
+     textcolor=color.white
+)
+//======================================================
+// SIGNAL ENGINE
+//======================================================
+
+cooldown = input.int(15,"Cooldown entre signaux")
+
+var int lastSignal = na
+
+canTrade =
+     na(lastSignal) or
+     bar_index-lastSignal > cooldown
+
+
+buySignal =
+     eliteBuy and
+     canTrade and
+     barstate.isconfirmed
+
+
+sellSignal =
+     eliteSell and
+     canTrade and
+     barstate.isconfirmed
+
+
+if buySignal or sellSignal
+    lastSignal := bar_index
+
+
+//======================================================
+// ENTRY SL TP LINES
+//======================================================
+
+var line entryLine = na
+var line stopLine = na
+var line tp1Line = na
+var line tp2Line = na
+
+
+if buySignal
+
+    line.delete(entryLine)
+    line.delete(stopLine)
+    line.delete(tp1Line)
+    line.delete(tp2Line)
+
+    entryLine := line.new(
+         bar_index,
+         entryHigh,
+         bar_index+25,
+         entryHigh,
+         color=color.blue,
+         width=2
+    )
+
+    stopLine := line.new(
+         bar_index,
+         stopLoss,
+         bar_index+25,
+         stopLoss,
+         color=color.red,
+         width=2
+    )
+
+    tp1Line := line.new(
+         bar_index,
+         tp1,
+         bar_index+25,
+         tp1,
+         color=color.green,
+         width=2
+    )
+
+    tp2Line := line.new(
+         bar_index,
+         tp2,
+         bar_index+25,
+         tp2,
+         color=color.lime,
+         width=2
+    )
+
+
+if sellSignal
+
+    line.delete(entryLine)
+    line.delete(stopLine)
+    line.delete(tp1Line)
+    line.delete(tp2Line)
+
+    entryLine := line.new(
+         bar_index,
+         entryLow,
+         bar_index+25,
+         entryLow,
+         color=color.blue,
+         width=2
+    )
+
+    stopLine := line.new(
+         bar_index,
+         stopLoss,
+         bar_index+25,
+         stopLoss,
+         color=color.red,
+         width=2
+    )
+
+    tp1Line := line.new(
+         bar_index,
+         tp1,
+         bar_index+25,
+         tp1,
+         color=color.green,
+         width=2
+    )
+
+    tp2Line := line.new(
+         bar_index,
+         tp2,
+         bar_index+25,
+         tp2,
+         color=color.lime,
+         width=2
+    )
+
+
+//======================================================
+// SIGNAL LABELS
+//======================================================
+
+plotshape(
+     showSignals and buySignal,
+     title="ATHENA ELITE BUY",
+     style=shape.labelup,
+     location=location.belowbar,
+     color=color.green,
+     text="ATHENA\nBUY",
+     textcolor=color.white,
+     size=size.normal
+)
+
+plotshape(
+     showSignals and sellSignal,
+     title="ATHENA ELITE SELL",
+     style=shape.labeldown,
+     location=location.abovebar,
+     color=color.red,
+     text="ATHENA\nSELL",
+     textcolor=color.white,
+     size=size.normal
+)
+
+
+//======================================================
+// DASHBOARD
+//======================================================
+
+var table dashboard =
+table.new(
+     position.top_right,
+     2,
+     12,
+     border_width=1
+)
+
+if barstate.islast and showDashboard
+
+    table.cell(dashboard,0,0,"ATHENA V9.1")
+    table.cell(dashboard,1,0,"PRO")
+
+    table.cell(dashboard,0,1,"Trend")
+    table.cell(
+         dashboard,
+         1,
+         1,
+         bullTrend ? "BULL" : "BEAR"
+    )
+
+    table.cell(dashboard,0,2,"BUY")
+    table.cell(
+         dashboard,
+         1,
+         2,
+         str.tostring(buyScore)+"/100"
+    )
+
+    table.cell(dashboard,0,3,"SELL")
+    table.cell(
+         dashboard,
+         1,
+         3,
+         str.tostring(sellScore)+"/100"
+    )
+
+    table.cell(dashboard,0,4,"Confidence")
+    table.cell(
+         dashboard,
+         1,
+         4,
+         str.tostring(confidence)+"%"
+    )
+
+    table.cell(dashboard,0,5,"Status")
+
+    table.cell(
+         dashboard,
+         1,
+         5,
+         buySignal ? "BUY" :
+         sellSignal ? "SELL" :
+         "WAIT"
+    )
+
+    table.cell(dashboard,0,6,"Entry")
+
+    table.cell(
+         dashboard,
+         1,
+         6,
+         str.tostring(entryLow)+"-"+str.tostring(entryHigh)
+    )
+
+    table.cell(dashboard,0,7,"SL")
+    table.cell(
+         dashboard,
+         1,
+         7,
+         str.tostring(stopLoss)
+    )
+
+    table.cell(dashboard,0,8,"TP1")
+    table.cell(
+         dashboard,
+         1,
+         8,
+         str.tostring(tp1)
+    )
+
+    table.cell(dashboard,0,9,"TP2")
+    table.cell(
+         dashboard,
+         1,
+         9,
+         str.tostring(tp2)
+    )
+
+    table.cell(dashboard,0,10,"ATR")
+    table.cell(
+         dashboard,
+         1,
+         10,
+         str.tostring(atr)
+    )
+
+    table.cell(dashboard,0,11,"Volatility")
+    table.cell(
+         dashboard,
+         1,
+         11,
+         highVolatility ? "HIGH" : "LOW"
+    )

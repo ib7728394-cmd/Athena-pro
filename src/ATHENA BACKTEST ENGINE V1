@@ -1,0 +1,558 @@
+//@version=6
+
+strategy(
+     "ATHENA BACKTEST ENGINE V1",
+     overlay=true,
+     initial_capital=500,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10,
+     pyramiding=0
+)
+
+
+//======================================================
+// INPUTS
+//======================================================
+
+atrSL = input.float(
+     0.6,
+     "ATR Stop Loss"
+)
+
+rrTP = input.float(
+     2.0,
+     "Risk Reward"
+)
+
+
+//======================================================
+// TREND ENGINE
+//======================================================
+
+ema50 = ta.ema(close,50)
+
+ema200 = ta.ema(close,200)
+
+
+bullTrend = ema50 > ema200
+
+bearTrend = ema50 < ema200
+
+
+plot(
+     ema50,
+     color=color.green
+)
+
+plot(
+     ema200,
+     color=color.red
+)
+
+
+//======================================================
+// MOMENTUM
+//======================================================
+
+rsi = ta.rsi(close,14)
+
+bullMomentum = rsi > 55
+
+bearMomentum = rsi < 45
+
+
+
+//======================================================
+// VOLATILITY
+//======================================================
+
+atr = ta.atr(14)
+
+atrAverage = ta.sma(
+     atr,
+     20
+)
+
+volatilityOK =
+     atr > atrAverage
+
+
+
+//======================================================
+// VOLUME
+//======================================================
+
+volumeOK =
+     volume > ta.sma(volume,20)
+     //======================================================
+// MARKET STRUCTURE ENGINE
+//======================================================
+
+swingLength = input.int(
+     5,
+     "Swing Length"
+)
+
+
+pivotHigh = ta.pivothigh(
+     high,
+     swingLength,
+     swingLength
+)
+
+pivotLow = ta.pivotlow(
+     low,
+     swingLength,
+     swingLength
+)
+
+
+var float lastHigh = na
+var float lastLow = na
+
+var float previousHigh = na
+var float previousLow = na
+
+
+if not na(pivotHigh)
+
+    previousHigh := lastHigh
+    lastHigh := pivotHigh
+
+
+if not na(pivotLow)
+
+    previousLow := lastLow
+    lastLow := pivotLow
+
+
+
+higherHigh =
+     not na(previousHigh) and
+     lastHigh > previousHigh
+
+
+higherLow =
+     not na(previousLow) and
+     lastLow > previousLow
+
+
+lowerHigh =
+     not na(previousHigh) and
+     lastHigh < previousHigh
+
+
+lowerLow =
+     not na(previousLow) and
+     lastLow < previousLow
+
+
+
+bullStructure =
+     higherHigh and higherLow
+
+
+bearStructure =
+     lowerHigh and lowerLow
+
+
+
+//======================================================
+// BOS / CHoCH
+//======================================================
+
+
+bullBOS =
+     bullStructure and
+     close > lastHigh
+
+
+bearBOS =
+     bearStructure and
+     close < lastLow
+
+
+
+bullCHoCH =
+     bearStructure and
+     close > lastHigh
+
+
+bearCHoCH =
+     bullStructure and
+     close < lastLow
+
+
+
+//======================================================
+// LIQUIDITY ENGINE
+//======================================================
+
+
+liquidityHigh =
+     high > ta.highest(high[1],20)
+
+
+liquidityLow =
+     low < ta.lowest(low[1],20)
+
+
+
+bullLiquidity =
+     liquidityLow and close > open
+
+
+bearLiquidity =
+     liquidityHigh and close < open
+
+
+
+//======================================================
+// ATHENA SCORE ENGINE
+//======================================================
+
+
+buyScore = 0
+
+sellScore = 0
+
+
+
+// Trend
+
+if bullTrend
+    buyScore += 25
+
+if bearTrend
+    sellScore += 25
+
+
+
+// RSI
+
+if bullMomentum
+    buyScore += 15
+
+if bearMomentum
+    sellScore += 15
+
+
+
+// Volatility
+
+if volatilityOK
+
+    buyScore += 10
+    sellScore += 10
+
+
+
+// Volume
+
+if volumeOK
+
+    buyScore += 10
+    sellScore += 10
+
+
+
+// Structure
+
+if bullStructure
+
+    buyScore += 15
+
+
+if bearStructure
+
+    sellScore += 15
+
+
+
+// BOS
+
+if bullBOS
+
+    buyScore += 10
+
+
+if bearBOS
+
+    sellScore += 10
+
+
+
+// Liquidity
+
+if bullLiquidity
+
+    buyScore += 15
+
+
+if bearLiquidity
+
+    sellScore += 15
+
+
+
+buyScore := math.min(
+     buyScore,
+     100
+)
+
+
+sellScore := math.min(
+     sellScore,
+     100
+)
+
+
+
+//======================================================
+// ENTRY CONDITIONS
+//======================================================
+
+
+eliteBuy =
+
+     buyScore >= 75 and
+     buyScore > sellScore
+
+
+
+eliteSell =
+
+     sellScore >= 75 and
+     sellScore > buyScore
+     //======================================================
+// RISK MANAGEMENT ENGINE
+//======================================================
+
+
+var float stopPrice = na
+var float targetPrice = na
+
+
+
+//======================================================
+// BUY EXECUTION
+//======================================================
+
+
+if eliteBuy and strategy.position_size <= 0
+
+    stopPrice := 
+         close - (atr * atrSL)
+
+
+    targetPrice :=
+         close + ((close - stopPrice) * rrTP)
+
+
+    strategy.entry(
+         "ATHENA BUY",
+         strategy.long
+    )
+
+
+    strategy.exit(
+         "EXIT BUY",
+         "ATHENA BUY",
+         stop=stopPrice,
+         limit=targetPrice
+    )
+
+
+
+
+//======================================================
+// SELL EXECUTION
+//======================================================
+
+
+if eliteSell and strategy.position_size >= 0
+
+
+    stopPrice := 
+         close + (atr * atrSL)
+
+
+    targetPrice :=
+         close - ((stopPrice - close) * rrTP)
+
+
+
+    strategy.entry(
+         "ATHENA SELL",
+         strategy.short
+    )
+
+
+    strategy.exit(
+         "EXIT SELL",
+         "ATHENA SELL",
+         stop=stopPrice,
+         limit=targetPrice
+    )
+
+
+
+
+//======================================================
+// VISUAL SIGNALS
+//======================================================
+
+
+plotshape(
+
+     eliteBuy,
+
+     title="ATHENA BACKTEST BUY",
+
+     style=shape.labelup,
+
+     location=location.belowbar,
+
+     color=color.green,
+
+     text="BUY"
+
+)
+
+
+
+plotshape(
+
+     eliteSell,
+
+     title="ATHENA BACKTEST SELL",
+
+     style=shape.labeldown,
+
+     location=location.abovebar,
+
+     color=color.red,
+
+     text="SELL"
+
+)
+
+
+
+//======================================================
+// INFO DASHBOARD
+//======================================================
+
+
+var table stats =
+table.new(
+     position.top_right,
+     2,
+     6,
+     border_width=1
+)
+
+
+
+if barstate.islast
+
+
+    table.cell(
+         stats,
+         0,
+         0,
+         "ATHENA BACKTEST"
+    )
+
+
+    table.cell(
+         stats,
+         1,
+         0,
+         "V1"
+    )
+
+
+
+    table.cell(
+         stats,
+         0,
+         1,
+         "BUY SCORE"
+    )
+
+
+    table.cell(
+         stats,
+         1,
+         1,
+         str.tostring(buyScore)
+    )
+
+
+
+    table.cell(
+         stats,
+         0,
+         2,
+         "SELL SCORE"
+    )
+
+
+    table.cell(
+         stats,
+         1,
+         2,
+         str.tostring(sellScore)
+    )
+
+
+
+    table.cell(
+         stats,
+         0,
+         3,
+         "ATR"
+    )
+
+
+    table.cell(
+         stats,
+         1,
+         3,
+         str.tostring(atr)
+    )
+
+
+
+    table.cell(
+         stats,
+         0,
+         4,
+         "Trades"
+    )
+
+
+    table.cell(
+         stats,
+         1,
+         4,
+         str.tostring(strategy.closedtrades)
+    )
+
+
+
+    table.cell(
+         stats,
+         0,
+         5,
+         "Net Profit"
+    )
+
+
+    table.cell(
+         stats,
+         1,
+         5,
+         str.tostring(strategy.netprofit)
+    )
