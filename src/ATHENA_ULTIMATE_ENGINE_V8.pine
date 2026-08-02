@@ -1,0 +1,738 @@
+//@version=6
+
+indicator(
+     "ATHENA V8 - Ultimate Institutional Trading Engine",
+     overlay=true,
+     max_labels_count=500,
+     max_lines_count=500
+)
+
+
+// =====================================
+// INPUTS
+// =====================================
+
+showDashboard = input.bool(true,"Afficher Dashboard")
+showLevels = input.bool(true,"Afficher Entry SL TP")
+cooldownBars = input.int(10,"Cooldown entre signaux")
+
+
+// =====================================
+// TREND ENGINE
+// =====================================
+
+ema50 = ta.ema(close,50)
+ema200 = ta.ema(close,200)
+
+trendBull = ema50 > ema200
+trendBear = ema50 < ema200
+
+
+trendScore = trendBull ? 30 : trendBear ? -30 : 0
+
+
+
+plot(
+ ema50,
+ color=color.green,
+ title="EMA 50"
+)
+
+plot(
+ ema200,
+ color=color.red,
+ title="EMA 200"
+)
+
+
+
+// =====================================
+// MOMENTUM ENGINE
+// =====================================
+
+rsi = ta.rsi(close,14)
+
+
+momentumBull = rsi > 50
+momentumBear = rsi < 50
+
+
+momentumScore =
+     momentumBull ? 20 :
+     momentumBear ? -20 :
+     0
+
+
+
+// =====================================
+// VOLATILITY ENGINE
+// =====================================
+
+atr = ta.atr(14)
+
+atrAverage = ta.sma(atr,20)
+
+
+volatilityOK = atr > atrAverage
+
+
+volatilityScore =
+     volatilityOK ? 10 : 0
+
+
+
+// =====================================
+// STRUCTURE ENGINE
+// =====================================
+
+pivot = input.int(5,"Structure Length")
+
+
+ph = ta.pivothigh(
+ high,
+ pivot,
+ pivot
+)
+
+
+pl = ta.pivotlow(
+ low,
+ pivot,
+ pivot
+)
+
+
+
+var float lastHigh = na
+var float prevHigh = na
+
+var float lastLow = na
+var float prevLow = na
+
+
+
+if not na(ph)
+    prevHigh := lastHigh
+    lastHigh := ph
+
+
+if not na(pl)
+    prevLow := lastLow
+    lastLow := pl
+
+
+
+HH = not na(prevHigh) and lastHigh > prevHigh
+LH = not na(prevHigh) and lastHigh < prevHigh
+
+HL = not na(prevLow) and lastLow > prevLow
+LL = not na(prevLow) and lastLow < prevLow
+
+
+
+bullStructure =
+     HH and HL
+
+
+bearStructure =
+     LH and LL
+
+
+
+BOS_Bull =
+     bullStructure and close > lastHigh
+
+
+BOS_Bear =
+     bearStructure and close < lastLow
+
+
+
+structureScore =
+     bullStructure ? 20 :
+     bearStructure ? -20 :
+     0
+
+
+
+plotshape(
+ BOS_Bull,
+ title="BOS Bull",
+ style=shape.triangleup,
+ color=color.lime,
+ text="BOS"
+)
+
+
+plotshape(
+ BOS_Bear,
+ title="BOS Bear",
+ style=shape.triangledown,
+ color=color.red,
+ text="BOS"
+)
+// =====================================
+// LIQUIDITY ENGINE
+// =====================================
+
+
+liquidityHigh = ta.highest(high,20)
+
+liquidityLow = ta.lowest(low,20)
+
+
+
+bullLiquidity =
+
+     low < liquidityLow[1]
+     and close > liquidityLow[1]
+
+
+
+bearLiquidity =
+
+     high > liquidityHigh[1]
+     and close < liquidityHigh[1]
+
+
+
+liquidityScore =
+
+     bullLiquidity ? 10 :
+     bearLiquidity ? -10 :
+     0
+
+
+
+
+plotshape(
+ bullLiquidity,
+ title="Liquidity Grab Bull",
+ style=shape.circle,
+ location=location.belowbar,
+ color=color.blue,
+ size=size.tiny,
+ text="LIQ"
+)
+
+
+
+plotshape(
+ bearLiquidity,
+ title="Liquidity Grab Bear",
+ style=shape.circle,
+ location=location.abovebar,
+ color=color.orange,
+ size=size.tiny,
+ text="LIQ"
+)
+
+
+
+
+
+// =====================================
+// ATHENA TOTAL SCORE
+// =====================================
+
+
+athenaScore =
+
+     trendScore +
+     momentumScore +
+     volatilityScore +
+     structureScore +
+     liquidityScore
+
+
+
+
+
+// =====================================
+// MULTI CONFIRMATION ENGINE
+// =====================================
+
+
+bullConfirm = 0
+
+bullConfirm += trendBull ? 1 : 0
+bullConfirm += momentumBull ? 1 : 0
+bullConfirm += bullStructure ? 1 : 0
+bullConfirm += bullLiquidity ? 1 : 0
+bullConfirm += volatilityOK ? 1 : 0
+
+
+
+bearConfirm = 0
+
+bearConfirm += trendBear ? 1 : 0
+bearConfirm += momentumBear ? 1 : 0
+bearConfirm += bearStructure ? 1 : 0
+bearConfirm += bearLiquidity ? 1 : 0
+bearConfirm += volatilityOK ? 1 : 0
+
+
+
+
+
+// =====================================
+// SIGNAL QUALITY
+// =====================================
+
+
+signalQuality =
+
+     athenaScore >= 80 ? "ELITE" :
+
+     athenaScore >= 65 ? "STRONG" :
+
+     athenaScore >= 50 ? "WATCH" :
+
+     "WAIT"
+
+
+
+
+
+// =====================================
+// COOLDOWN SYSTEM
+// =====================================
+
+
+var int lastSignalBar = na
+
+
+canTrade =
+
+     na(lastSignalBar)
+     or bar_index - lastSignalBar > cooldownBars
+
+
+
+
+
+// =====================================
+// FINAL ATHENA DECISION
+// =====================================
+
+
+
+eliteBuy =
+
+     barstate.isconfirmed
+     and canTrade
+     and trendBull
+     and athenaScore >= 75
+     and bullConfirm >= 3
+
+
+
+eliteSell =
+
+     barstate.isconfirmed
+     and canTrade
+     and trendBear
+     and athenaScore <= -75
+     and bearConfirm >= 3
+
+
+
+strongBuy =
+
+     barstate.isconfirmed
+     and canTrade
+     and trendBull
+     and athenaScore >= 60
+     and bullConfirm >= 2
+
+
+
+strongSell =
+
+     barstate.isconfirmed
+     and canTrade
+     and trendBear
+     and athenaScore <= -60
+     and bearConfirm >= 2
+
+
+
+buySignal = eliteBuy or strongBuy
+
+sellSignal = eliteSell or strongSell
+
+
+
+
+if buySignal or sellSignal
+    lastSignalBar := bar_index
+    // =====================================
+// ATHENA RISK MANAGEMENT ENGINE
+// =====================================
+
+
+riskATR = input.float(
+     1.5,
+     "ATR Stop Multiplier"
+)
+
+
+rewardRatio = input.float(
+     2.0,
+     "Risk Reward"
+)
+
+
+
+entryPrice = close
+
+
+
+// BUY PLAN
+
+buySL = entryPrice - (atr * riskATR)
+
+buyTP = entryPrice + ((entryPrice - buySL) * rewardRatio)
+
+
+
+// SELL PLAN
+
+sellSL = entryPrice + (atr * riskATR)
+
+sellTP = entryPrice - ((sellSL - entryPrice) * rewardRatio)
+
+
+
+
+
+// =====================================
+// TRADE LEVEL DISPLAY
+// =====================================
+
+
+var line entryLine = na
+var line stopLine = na
+var line targetLine = na
+
+
+
+if buySignal and showLevels
+
+
+    line.delete(entryLine)
+    line.delete(stopLine)
+    line.delete(targetLine)
+
+
+    entryLine := line.new(
+         bar_index,
+         entryPrice,
+         bar_index + 20,
+         entryPrice,
+         color=color.blue,
+         width=2
+    )
+
+
+    stopLine := line.new(
+         bar_index,
+         buySL,
+         bar_index + 20,
+         buySL,
+         color=color.red,
+         width=2
+    )
+
+
+    targetLine := line.new(
+         bar_index,
+         buyTP,
+         bar_index + 20,
+         buyTP,
+         color=color.green,
+         width=2
+    )
+
+
+
+
+if sellSignal and showLevels
+
+
+    line.delete(entryLine)
+    line.delete(stopLine)
+    line.delete(targetLine)
+
+
+    entryLine := line.new(
+         bar_index,
+         entryPrice,
+         bar_index + 20,
+         entryPrice,
+         color=color.blue,
+         width=2
+    )
+
+
+    stopLine := line.new(
+         bar_index,
+         sellSL,
+         bar_index + 20,
+         sellSL,
+         color=color.red,
+         width=2
+    )
+
+
+    targetLine := line.new(
+         bar_index,
+         sellTP,
+         bar_index + 20,
+         sellTP,
+         color=color.green,
+         width=2
+    )
+
+
+
+
+
+// =====================================
+// SIGNAL LABELS
+// =====================================
+
+
+plotshape(
+
+     buySignal,
+
+     title="ATHENA BUY",
+
+     style=shape.labelup,
+
+     location=location.belowbar,
+
+     color=color.green,
+
+     text="ATHENA BUY",
+
+     textcolor=color.white
+
+)
+
+
+
+
+plotshape(
+
+     sellSignal,
+
+     title="ATHENA SELL",
+
+     style=shape.labeldown,
+
+     location=location.abovebar,
+
+     color=color.red,
+
+     text="ATHENA SELL",
+
+     textcolor=color.white
+
+)
+
+
+
+
+
+
+// =====================================
+// DASHBOARD ATHENA V8
+// =====================================
+
+
+var table athenaPanel = table.new(
+
+     position.top_right,
+
+     2,
+
+     10,
+
+     border_width=1
+
+)
+
+
+
+if barstate.islast and showDashboard
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         0,
+         "ATHENA V8"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         0,
+         "ULTIMATE"
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         1,
+         "Score"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         1,
+         str.tostring(athenaScore)
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         2,
+         "Quality"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         2,
+         signalQuality
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         3,
+         "Bull Conf"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         3,
+         str.tostring(bullConfirm)
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         4,
+         "Bear Conf"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         4,
+         str.tostring(bearConfirm)
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         5,
+         "Trend"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         5,
+         trendBull ? "BULLISH" : "BEARISH"
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         6,
+         "Entry"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         6,
+         str.tostring(entryPrice)
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         7,
+         "Stop Loss"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         7,
+         buySignal ? str.tostring(buySL) : str.tostring(sellSL)
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         8,
+         "Take Profit"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         8,
+         buySignal ? str.tostring(buyTP) : str.tostring(sellTP)
+    )
+
+
+
+    table.cell(
+         athenaPanel,
+         0,
+         9,
+         "Risk Reward"
+    )
+
+
+    table.cell(
+         athenaPanel,
+         1,
+         9,
+         "1:" + str.tostring(rewardRatio)
+    )
