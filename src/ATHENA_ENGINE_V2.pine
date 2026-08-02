@@ -1,38 +1,49 @@
 //@version=6
 
-indicator("ATHENA V2 - Intelligence Engine", overlay=true, max_labels_count=500)
+indicator("ATHENA V2 - Smart Confluence Engine", overlay=true, max_labels_count=500)
+
 
 // ==========================================
 // ATHENA INTELLIGENCE CORE
+// SPRINT 8 - SMART CONFLUENCE ENGINE
 // ==========================================
+
 
 // PARAMÈTRES
 
-showDashboard = input.bool(true, "Afficher Dashboard ATHENA")
 showSignals = input.bool(true, "Afficher Signaux")
+
 
 // =====================================
 // TREND ENGINE
 // =====================================
 
-emaFast = ta.ema(close, 50)
-emaSlow = ta.ema(close, 200)
+emaFast = ta.ema(close,50)
+emaSlow = ta.ema(close,200)
+
 
 trendBullish = emaFast > emaSlow
 trendBearish = emaFast < emaSlow
 
+
 trendScore = trendBullish ? 30 : 0
+
+
 
 // =====================================
 // MOMENTUM ENGINE
 // =====================================
 
-rsiValue = ta.rsi(close, 14)
+rsiValue = ta.rsi(close,14)
+
 
 momentumBullish = rsiValue > 50
 momentumBearish = rsiValue < 50
 
+
 momentumScore = momentumBullish ? 25 : 0
+
+
 
 // =====================================
 // VOLATILITY ENGINE
@@ -40,16 +51,24 @@ momentumScore = momentumBullish ? 25 : 0
 
 atrValue = ta.atr(14)
 
-volatilityScore = atrValue > ta.sma(atrValue, 20) ? 20 : 0
+
+volatilityScore =
+     atrValue > ta.sma(atrValue,20) ? 20 : 0
+
+
 
 // =====================================
-// STRUCTURE ENGINE (SPRINT 7)
+// STRUCTURE ENGINE
 // =====================================
 
-pivotLength = input.int(5, "Swing Length", minval = 2)
+pivotLength = input.int(5,"Swing Length",minval=2)
 
-pivotHigh = ta.pivothigh(high, pivotLength, pivotLength)
-pivotLow = ta.pivotlow(low, pivotLength, pivotLength)
+
+pivotHigh = ta.pivothigh(high,pivotLength,pivotLength)
+
+pivotLow = ta.pivotlow(low,pivotLength,pivotLength)
+
+
 
 var float lastHigh = na
 var float previousHigh = na
@@ -57,107 +76,233 @@ var float previousHigh = na
 var float lastLow = na
 var float previousLow = na
 
+
+
 if not na(pivotHigh)
     previousHigh := lastHigh
     lastHigh := pivotHigh
+
 
 if not na(pivotLow)
     previousLow := lastLow
     lastLow := pivotLow
 
+
+
+
 higherHigh = not na(previousHigh) and lastHigh > previousHigh
+
 lowerHigh = not na(previousHigh) and lastHigh < previousHigh
 
+
 higherLow = not na(previousLow) and lastLow > previousLow
+
 lowerLow = not na(previousLow) and lastLow < previousLow
 
+
+
 bullStructure = higherHigh and higherLow
+
 bearStructure = lowerHigh and lowerLow
 
-bullBOS = bullStructure and not na(lastHigh) and close > lastHigh
-bearBOS = bearStructure and not na(lastLow) and close < lastLow
 
-bullChoch = bearStructure and not na(lastHigh) and close > lastHigh
-bearChoch = bullStructure and not na(lastLow) and close < lastLow
-
-structureScore = (bullStructure or bearStructure) ? 25 : 0
 
 // =====================================
-// ATHENA SCORE
+// BOS / CHoCH ENGINE
 // =====================================
 
-athenaScore = trendScore + momentumScore + volatilityScore + structureScore
+
+bullBOS =
+     bullStructure and
+     not na(lastHigh) and
+     close > lastHigh
+
+
+
+bearBOS =
+     bearStructure and
+     not na(lastLow) and
+     close < lastLow
+
+
+
+
+bullChoch =
+     bearStructure and
+     not na(lastHigh) and
+     close > lastHigh
+
+
+
+bearChoch =
+     bullStructure and
+     not na(lastLow) and
+     close < lastLow
+
+
+
+structureScore =
+     (bullStructure or bearStructure) ? 25 : 0
+
+
+
 
 // =====================================
-// DECISION ENGINE
+// SMART CONFLUENCE SCORE
 // =====================================
 
-buySignal = athenaScore >= 70 and trendBullish
-sellSignal = athenaScore >= 70 and trendBearish
+
+volumeScore =
+     volume > ta.sma(volume,20) ? 5 : 0
+
+
+
+bosScore =
+     (bullBOS or bearBOS) ? 15 : 0
+
+
+
+chochScore =
+     (bullChoch or bearChoch) ? 10 : 0
+
+
+
+athenaScore =
+     trendScore +
+     momentumScore +
+     volatilityScore +
+     structureScore +
+     bosScore +
+     chochScore +
+     volumeScore
+
+
+
+
+
+// =====================================
+// QUALITY SYSTEM
+// =====================================
+
+
+gradeAPlus = athenaScore >= 90
+
+gradeA = athenaScore >= 80
+
+gradeB = athenaScore >= 70
+
+gradeC = athenaScore >= 60
+
+
+
+
+
+// =====================================
+// ATHENA ENTRY FILTER
+// =====================================
+
+
+buySignal =
+     athenaScore >= 70 and
+     trendBullish and
+     (bullStructure or bullBOS or bullChoch)
+
+
+
+sellSignal =
+     athenaScore >= 70 and
+     trendBearish and
+     (bearStructure or bearBOS or bearChoch)
+
+
+
+
 
 // =====================================
 // AFFICHAGE
 // =====================================
 
-plot(emaFast, title="EMA 50", color=color.green)
-plot(emaSlow, title="EMA 200", color=color.red)
 
-plotshape(
-    buySignal,
-    title="ATHENA BUY",
-    style=shape.labelup,
-    location=location.belowbar,
-    color=color.green,
-    text="BUY",
-    textcolor=color.white
+plot(
+     emaFast,
+     title="EMA 50",
+     color=color.green
 )
 
-plotshape(
-    sellSignal,
-    title="ATHENA SELL",
-    style=shape.labeldown,
-    location=location.abovebar,
-    color=color.red,
-    text="SELL",
-    textcolor=color.white
+
+plot(
+     emaSlow,
+     title="EMA 200",
+     color=color.red
 )
 
-plotshape(
-    bullBOS,
-    title="BOS Haussier",
-    style=shape.triangleup,
-    location=location.belowbar,
-    color=color.lime,
-    size=size.small,
-    text="BOS"
-)
+
+
 
 plotshape(
-    bearBOS,
-    title="BOS Baissier",
-    style=shape.triangledown,
-    location=location.abovebar,
-    color=color.red,
-    size=size.small,
-    text="BOS"
+     showSignals and buySignal,
+     title="ATHENA BUY",
+     style=shape.labelup,
+     location=location.belowbar,
+     color=color.green,
+     text="ATHENA BUY",
+     textcolor=color.white
 )
 
-plotshape(
-    bullChoch,
-    title="CHoCH Haussier",
-    style=shape.circle,
-    location=location.belowbar,
-    color=color.blue,
-    size=size.tiny,
-    text="CH"
-)
+
 
 plotshape(
-    bearChoch,
-    title="CHoCH Baissier",
-    style=shape.circle,
-    location=location.abovebar,
-    color=color.orange,
-    size=size.tiny,
-    text="CH"
+     showSignals and sellSignal,
+     title="ATHENA SELL",
+     style=shape.labeldown,
+     location=location.abovebar,
+     color=color.red,
+     text="ATHENA SELL",
+     textcolor=color.white
+)
+
+
+
+
+plotshape(
+     bullBOS,
+     title="BOS HAUSSIER",
+     style=shape.triangleup,
+     location=location.belowbar,
+     color=color.lime,
+     text="BOS"
+)
+
+
+
+plotshape(
+     bearBOS,
+     title="BOS BAISSIER",
+     style=shape.triangledown,
+     location=location.abovebar,
+     color=color.red,
+     text="BOS"
+)
+
+
+
+
+plotshape(
+     bullChoch,
+     title="CHoCH HAUSSIER",
+     style=shape.circle,
+     location=location.belowbar,
+     color=color.blue,
+     text="CH"
+)
+
+
+
+plotshape(
+     bearChoch,
+     title="CHoCH BAISSIER",
+     style=shape.circle,
+     location=location.abovebar,
+     color=color.orange,
+     text="CH"
 )
