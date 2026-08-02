@@ -1,18 +1,17 @@
 //@version=6
 
-indicator("ATHENA V2 - Liquidity Intelligence Engine", overlay=true, max_labels_count=500)
+indicator("ATHENA V2 - Institutional Intelligence Engine", overlay=true, max_labels_count=500)
 
 
 // ==========================================
 // ATHENA INTELLIGENCE CORE
-// SPRINT 9 - LIQUIDITY ENGINE
+// SPRINT 10 - ORDER BLOCK ENGINE
 // ==========================================
 
 
 // PARAMÈTRES
 
 showSignals = input.bool(true, "Afficher Signaux")
-
 
 
 // =====================================
@@ -31,7 +30,6 @@ trendScore = trendBullish ? 30 : 0
 
 
 
-
 // =====================================
 // MOMENTUM ENGINE
 // =====================================
@@ -44,7 +42,6 @@ momentumBearish = rsiValue < 50
 
 
 momentumScore = momentumBullish ? 25 : 0
-
 
 
 
@@ -66,7 +63,6 @@ volatilityScore =
 // STRUCTURE ENGINE
 // =====================================
 
-
 pivotLength = input.int(5,"Swing Length",minval=2)
 
 
@@ -85,14 +81,11 @@ var float previousLow = na
 
 
 if not na(pivotHigh)
-
     previousHigh := lastHigh
     lastHigh := pivotHigh
 
 
-
 if not na(pivotLow)
-
     previousLow := lastLow
     lastLow := pivotLow
 
@@ -162,7 +155,7 @@ structureScore =
 
 
 // =====================================
-// ATHENA LIQUIDITY ENGINE
+// LIQUIDITY ENGINE
 // SPRINT 9
 // =====================================
 
@@ -170,23 +163,17 @@ structureScore =
 liquidityLength = input.int(20,"Liquidity Lookback")
 
 
-// anciens niveaux de liquidité
-
 previousHighLiquidity = ta.highest(high, liquidityLength)
 
 previousLowLiquidity = ta.lowest(low, liquidityLength)
 
 
 
-// Liquidity Sweep au-dessus des sommets
-
 buySideSweep =
      high > previousHighLiquidity[1] and
      close < previousHighLiquidity[1]
 
 
-
-// Liquidity Sweep sous les creux
 
 sellSideSweep =
      low < previousLowLiquidity[1] and
@@ -196,6 +183,42 @@ sellSideSweep =
 
 liquidityScore =
      (buySideSweep or sellSideSweep) ? 15 : 0
+
+
+
+
+
+// =====================================
+// ORDER BLOCK ENGINE
+// SPRINT 10
+// =====================================
+
+
+bullishOrderBlock =
+     close[1] < open[1] and
+     close > high[1]
+
+
+
+bearishOrderBlock =
+     close[1] > open[1] and
+     close < low[1]
+
+
+
+bullOBHigh = bullishOrderBlock ? high[1] : na
+
+bullOBLow = bullishOrderBlock ? low[1] : na
+
+
+bearOBHigh = bearishOrderBlock ? high[1] : na
+
+bearOBLow = bearishOrderBlock ? low[1] : na
+
+
+
+orderBlockScore =
+     (bullishOrderBlock or bearishOrderBlock) ? 15 : 0
 
 
 
@@ -232,7 +255,8 @@ athenaScore =
      bosScore +
      chochScore +
      volumeScore +
-     liquidityScore
+     liquidityScore +
+     orderBlockScore
 
 
 
@@ -256,7 +280,7 @@ gradeC = athenaScore >= 60
 
 
 // =====================================
-// ATHENA ENTRY FILTER
+// ATHENA DECISION ENGINE
 // =====================================
 
 
@@ -278,9 +302,8 @@ sellSignal =
 
 
 
-
 // =====================================
-// AFFICHAGE
+// AFFICHAGE PRINCIPAL
 // =====================================
 
 
@@ -289,7 +312,6 @@ plot(
      title="EMA 50",
      color=color.green
 )
-
 
 
 plot(
@@ -328,7 +350,9 @@ plotshape(
 
 
 
-// BOS
+// =====================================
+// BOS / CHoCH AFFICHAGE
+// =====================================
 
 
 plotshape(
@@ -339,7 +363,6 @@ plotshape(
      color=color.lime,
      text="BOS"
 )
-
 
 
 plotshape(
@@ -353,11 +376,6 @@ plotshape(
 
 
 
-
-
-// CHoCH
-
-
 plotshape(
      bullChoch,
      title="CHoCH HAUSSIER",
@@ -366,7 +384,6 @@ plotshape(
      color=color.blue,
      text="CH"
 )
-
 
 
 plotshape(
@@ -383,13 +400,13 @@ plotshape(
 
 
 // =====================================
-// LIQUIDITY VISUALIZATION
+// LIQUIDITY AFFICHAGE
 // =====================================
 
 
 plotshape(
      buySideSweep,
-     title="Buy Side Liquidity Sweep",
+     title="BUY SIDE LIQUIDITY SWEEP",
      style=shape.triangledown,
      location=location.abovebar,
      color=color.yellow,
@@ -400,9 +417,40 @@ plotshape(
 
 plotshape(
      sellSideSweep,
-     title="Sell Side Liquidity Sweep",
+     title="SELL SIDE LIQUIDITY SWEEP",
      style=shape.triangleup,
      location=location.belowbar,
      color=color.yellow,
      text="LIQ"
+)
+
+
+
+
+
+// =====================================
+// ORDER BLOCK AFFICHAGE
+// =====================================
+
+
+plotshape(
+     bullishOrderBlock,
+     title="BULLISH ORDER BLOCK",
+     style=shape.square,
+     location=location.belowbar,
+     color=color.green,
+     size=size.tiny,
+     text="OB"
+)
+
+
+
+plotshape(
+     bearishOrderBlock,
+     title="BEARISH ORDER BLOCK",
+     style=shape.square,
+     location=location.abovebar,
+     color=color.red,
+     size=size.tiny,
+     text="OB"
 )
